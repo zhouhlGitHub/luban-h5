@@ -1,4 +1,20 @@
 <script>
+import Vue from 'vue'
+
+const JustPrintSomething = {
+  data: () => ({
+    a: 10,
+  }),
+  methods: {
+    printSomething () {
+      console.log('输入做点啥', this.a)
+    }
+  },
+  created () {
+    console.log('mixied created')
+  }
+}
+
 // LuBanPlugin -> Lbp
 const LbpButton = {
   render () {
@@ -344,11 +360,14 @@ const Editor = {
   data: () => ({
     pages: [],
     elements: [],
-    editingElement: null
+    editingElement: null,
+    isPreviewMode: 'edit',
   }),
   methods: {
     getEditorConfig (pluginName) {
-      return this.$options.components[pluginName].editorConfig
+      const pluginCtor = Vue.component(pluginName)
+      return new pluginCtor().$options.editorConfig
+      // return this.$options.components[pluginName].editorConfig
     },
     /**
      * !#zh 点击插件，copy 其基础数据到组件树（中间画布）
@@ -358,7 +377,21 @@ const Editor = {
       const zindex = this.elements.length + 1
       // const defaultPropsValue = this.getPropsDefaultValue(name)
       const editorConfig = this.getEditorConfig(name)
-      this.elements.push(new Element({ name, zindex, editorConfig }))
+      // Vue.extends(this.$options.components[name])
+      // const enhancedPlugin = {
+      //   extends: this.$options.components[name],
+      //   name: `${name}${zindex}`,
+      // }
+      // const enhancedPlugin = this.$options.components[name].extend({ name: `${name}${zindex}` })
+      const newName = `${name}${zindex}`
+      const enhancedPlugin = Vue.extend({
+        mixins: [this.$options.components[name]],
+      })
+      Vue.component(newName, enhancedPlugin)
+      // debugger
+      // this.$options.components[enhancedPlugin.name] = enhancedPlugin
+      this.elements.push(new Element({ name: newName, zindex, editorConfig }))
+      // this.elements.push(new Element({ name, zindex, editorConfig }))
     },
     mixinPluginCustomComponents2Editor () {
       const { components } = this.editingElement.editorConfig
@@ -370,6 +403,17 @@ const Editor = {
     setCurrentEditingElement (element) {
       this.editingElement = element
       this.mixinPluginCustomComponents2Editor()
+    },
+    mixinScript (e) {
+      e.preventDefault()
+      const pluginName = this.editingElement.name
+      const editingPlugin = this.$options.components[this.editingElement.name]
+      const newEdingtingPlugin = editingPlugin.mixin({
+        name: pluginName,
+        ...JustPrintSomething
+      })
+      Vue.component(pluginName, newEdingtingPlugin)
+      console.log(this.$options.components)
     },
     /**
      * #!zh: renderCanvas 渲染中间画布
@@ -388,6 +432,29 @@ const Editor = {
                 props: element.pluginProps, // #6 #3
                 nativeOn: {
                   click: this.setCurrentEditingElement.bind(this, element)
+                }
+              }
+              return h(element.name, data)
+            })()
+          })}
+        </div>
+      )
+    },
+    renderPreview (h, elements) {
+      return (
+        <div style={{ height: '100%' }}>
+          {elements.map((element, index) => {
+            const plugin = this.$options.components[element.name]
+            // const vm = this.$refs[element.ref]
+            // console.log(vm.printSomething)
+            // console.log(new plugin().printSomething)
+            return (() => {
+              const data = {
+                style: element.getStyle(),
+                props: element.pluginProps, // #6 #3
+                ref: element.ref,
+                nativeOn: {
+                  click: new plugin().printSomething
                 }
               }
               return h(element.name, data)
@@ -454,6 +521,7 @@ const Editor = {
               )
             })
           }
+          <button onClick={this.mixinScript.bind(this)}>添加脚本</button>
         </el-form>
       )
     }
@@ -465,8 +533,14 @@ const Editor = {
           { this.renderPluginListPanel() }
         </div>
         <div class='el-col-13'>
+          <div style="text-align: center;">
+            <el-radio-group value={this.isPreviewMode} onInput={(value) => this.isPreviewMode = value} size="mini">
+              <el-radio-button label="edit"></el-radio-button>
+              <el-radio-button label="preview"></el-radio-button>
+            </el-radio-group>
+          </div>
           <div class='canvas-wrapper'>
-            { this.renderCanvas(h, this.elements) }
+            { this.isPreviewMode === 'edit' ? this.renderCanvas(h, this.elements) : this.renderPreview(h, this.elements) }
           </div>
         </div>
         <div class='el-col-6' style="border-left: 1px solid #eee;">
@@ -488,7 +562,8 @@ export default {
   methods: {
     mixinPlugins2Editor () {
       PluginList.forEach(plugin => {
-        this.$options.components[plugin.name] = plugin.component
+        Vue.component(plugin.name, plugin.component)
+        // this.$options.components[plugin.name] = plugin.component
       })
     }
   },
