@@ -144,6 +144,13 @@ export default {
                 props: element.pluginProps, // #6 #3
                 nativeOn: {
                   click: this.setCurrentEditingElement.bind(this, element)
+                },
+                on: {
+                  input ({ pluginName, value }) {
+                    if (pluginName === 'lbp-text') {
+                      element.pluginProps.text = value
+                    }
+                  }
                 }
               }
               return h(element.name, data)
@@ -182,11 +189,15 @@ export default {
       )
     },
     renderPropsEditorPanel (h) {
+      const formLayout = {
+        labelCol: { span: 5 },
+        wrapperCol: { span: 8 }
+      }
       if (!this.editingElement) return (<span>请先选择一个元素</span>)
       const editingElement = this.editingElement
       const propsConfig = editingElement.editorConfig.propsConfig
       return (
-        <a-form ref="form" label-width="100px" size="mini" label-position="left">
+        <a-form ref="form" layout="horizontal">
           {
             Object.keys(propsConfig).map(propKey => {
               const item = propsConfig[propKey]
@@ -208,7 +219,10 @@ export default {
                 }
               }
               return (
-                <a-form-item label={item.label}>
+                <a-form-item
+                  label={item.label}
+                  {...formLayout}
+                >
                   { h(item.type, data) }
                 </a-form-item>
               )
@@ -300,7 +314,9 @@ export default {
                   <a-icon type="apple" />
                   属性
                 </span>
-                { this.renderPropsEditorPanel(h) }
+                <div style={{ overflow: 'scroll', height: '100vh' }}>
+                  { this.renderPropsEditorPanel(h) }
+                </div>
               </a-tab-pane>
               <a-tab-pane label="动画" key='动画' tab='动画'>动画</a-tab-pane>
               <a-tab-pane label="动作" key='动作' tab='动作'>动作</a-tab-pane>
